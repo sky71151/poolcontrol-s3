@@ -1,0 +1,58 @@
+name: Build And Release Firmware
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build Firmware
+        run: pio run
+
+      - name: Read OTA Version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep -E '^#define OTA_GITHUB_CURRENT_VERSION "' include/config.h | sed -E 's/^#define OTA_GITHUB_CURRENT_VERSION "([^"]+)"/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "Could not read OTA_GITHUB_CURRENT_VERSION" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          cp .pio/build/esp32s3_120_16_8-qio_opi/firmware.bin poolcontrol-${{ steps.version.outputs.version }}.bin
+          cp .pio/build/esp32s3_120_16_8-qio_opi/firmware.factory.bin poolcontrol-${{ steps.version.outputs.version }}.factory.bin
+
+      - name: Create Or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: PoolControl ${{ steps.version.outputs.version }}
+          files: |
+            poolcontrol-${{ steps.version.outputs.version }}.bin
+            poolcontrol-${{ steps.version.outputs.version }}.factory.bin
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

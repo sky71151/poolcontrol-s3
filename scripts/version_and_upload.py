@@ -127,6 +127,30 @@ def _delete_existing_asset_if_needed(repo: str, token: str, release: dict, asset
             return
 
 
+def _upload_asset(repo: str, token: str, release: dict, asset_name: str, asset_path: Path):
+    if not asset_path.exists():
+        _log(f"Skipping missing asset: {asset_path.name}")
+        return
+
+    _delete_existing_asset_if_needed(repo, token, release, asset_name)
+
+    upload_url_template = release.get("upload_url", "")
+    if not upload_url_template:
+        raise RuntimeError("Release upload_url missing in GitHub response")
+
+    upload_url = upload_url_template.split("{")[0]
+    upload_url = f"{upload_url}?name={urllib.parse.quote(asset_name)}"
+
+    _log(f"Uploading {asset_path.name} to release as {asset_name}")
+    _github_request(
+        "POST",
+        upload_url,
+        token,
+        data=asset_path.read_bytes(),
+        headers={"Content-Type": "application/octet-stream"},
+    )
+
+
 def upload_bin_after_build(source, target, env):
     global NEW_VERSION
 
@@ -142,7 +166,7 @@ def upload_bin_after_build(source, target, env):
         return
 
     release_prefix = os.getenv("GITHUB_RELEASE_PREFIX", "v")
-    asset_name = os.getenv("GITHUB_ASSET_NAME", "poolcontrol.bin")
+    base_asset_name = os.getenv("GITHUB_ASSET_NAME", "poolcontrol")
     tag_name = f"{release_prefix}{NEW_VERSION}"
     release_name = f"PoolControl {NEW_VERSION}"
 
@@ -154,26 +178,13 @@ def upload_bin_after_build(source, target, env):
     if not firmware_path.exists():
         raise RuntimeError(f"Firmware binary not found: {firmware_path}")
 
+    factory_path = firmware_path.with_suffix("").with_suffix(".factory.bin")
+
     release = _get_or_create_release(repo, token, tag_name, release_name)
-    _delete_existing_asset_if_needed(repo, token, release, asset_name)
 
-    upload_url_template = release.get("upload_url", "")
-    if not upload_url_template:
-        raise RuntimeError("Release upload_url missing in GitHub response")
-
-    upload_url = upload_url_template.split("{")[0]
-    upload_url = f"{upload_url}?name={urllib.parse.quote(asset_name)}"
-
-    _log(f"Uploading {firmware_path.name} to {repo} release {tag_name} as {asset_name}")
-    firmware_data = firmware_path.read_bytes()
-
-    _github_request(
-        "POST",
-        upload_url,
-        token,
-        data=firmware_data,
-        headers={"Content-Type": "application/octet-stream"},
-    )
+    _log(f"Uploading artifacts to {repo} release {tag_name}")
+    _upload_asset(repo, token, release, f"{base_asset_name}.bin", firmware_path)
+    _upload_asset(repo, token, release, f"{base_asset_name}.factory.bin", factory_path)
 
     _log("GitHub upload completed")
 
