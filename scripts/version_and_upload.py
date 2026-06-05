@@ -189,5 +189,8 @@ def upload_bin_after_build(source, target, env):
     _log("GitHub upload completed")
 
 
-env.AddPreAction("$BUILD_DIR/${PROGNAME}.bin", bump_version_before_build)
-env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", upload_bin_after_build)
+if os.getenv("PIO_DISABLE_GITHUB_UPLOAD_SCRIPT", "0") != "1":
+    env.AddPreAction("$BUILD_DIR/${PROGNAME}.bin", bump_version_before_build)
+    env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", upload_bin_after_build)
+else:
+    _log("Build hooks disabled by PIO_DISABLE_GITHUB_UPLOAD_SCRIPT=1")
