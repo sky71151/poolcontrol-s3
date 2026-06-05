@@ -77,7 +77,7 @@ class BleRxCallbacks : public BLECharacteristicCallbacks {
       return;
     }
 
-    String payload = characteristic->getValue();
+    auto payload = characteristic->getValue();
     if (payload.length() > 0) {
       receiveCallback(payload.c_str());
     }
