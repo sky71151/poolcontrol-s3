@@ -42,19 +42,34 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Artifacts
+        id: artifacts
         shell: bash
         run: |
           cp .pio/build/esp32s3_120_16_8-qio_opi/firmware.bin poolcontrol-${{ steps.version.outputs.version }}.bin
-          cp .pio/build/esp32s3_120_16_8-qio_opi/firmware.factory.bin poolcontrol-${{ steps.version.outputs.version }}.factory.bin
+
+          ARTIFACT_FILES="poolcontrol-${{ steps.version.outputs.version }}.bin"
+          FACTORY_SRC=".pio/build/esp32s3_120_16_8-qio_opi/firmware.factory.bin"
+          FACTORY_DST="poolcontrol-${{ steps.version.outputs.version }}.factory.bin"
+
+          if [ -f "$FACTORY_SRC" ]; then
+            cp "$FACTORY_SRC" "$FACTORY_DST"
+            ARTIFACT_FILES="$ARTIFACT_FILES\n$FACTORY_DST"
+          else
+            echo "factory image not generated, releasing main firmware only"
+          fi
+
+          {
+            echo "files<<EOF"
+            printf "%b\n" "$ARTIFACT_FILES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Or Update Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: PoolControl ${{ steps.version.outputs.version }}
-          files: |
-            poolcontrol-${{ steps.version.outputs.version }}.bin
-            poolcontrol-${{ steps.version.outputs.version }}.factory.bin
+          files: ${{ steps.artifacts.outputs.files }}
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
