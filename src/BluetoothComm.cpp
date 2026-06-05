@@ -9,6 +9,10 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+#if __has_include(<soc/soc_caps.h>)
+#include <soc/soc_caps.h>
+#endif
+
 #include "SerialComm.h"
 
 #if __has_include(<BLEDevice.h>)
@@ -21,7 +25,7 @@
 #define BLUETOOTH_COMM_HAS_BLE 0
 #endif
 
-#if __has_include(<BluetoothSerial.h>) && defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED)
+#if __has_include(<BluetoothSerial.h>) && defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED) && defined(CONFIG_BT_SPP_ENABLED) && defined(SOC_BT_CLASSIC_SUPPORTED) && SOC_BT_CLASSIC_SUPPORTED
 #include <BluetoothSerial.h>
 #define BLUETOOTH_COMM_HAS_CLASSIC 1
 #else
